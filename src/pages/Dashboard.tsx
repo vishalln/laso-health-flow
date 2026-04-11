@@ -12,10 +12,11 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { Pill, Calendar, Video, ClipboardCheck, Bell, TrendingDown, Activity } from 'lucide-react';
 
 export default function Dashboard() {
-  const { isLoggedIn, userName, selectedProgram, setSelectedProgram, setIsLoggedIn, setUserName } = useUser();
+  const { isLoggedIn, userName, selectedProgram, setIsLoggedIn, setUserName } = useUser();
   const navigate = useNavigate();
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+  const [viewMode, setViewMode] = useState<'weight-loss' | 'diabetes'>(selectedProgram === 'diabetes' ? 'diabetes' : 'weight-loss');
 
   if (!isLoggedIn) {
     return (
