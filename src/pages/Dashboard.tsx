@@ -57,8 +57,8 @@ export default function Dashboard() {
           <div className="flex gap-2">
             {selectedProgram === 'both' && (
               <div className="flex rounded-lg border border-border bg-card p-0.5">
-                <button onClick={() => setSelectedProgram('weight-loss')} className={`rounded-md px-3 py-1 text-xs font-medium ${isWeightLoss && !isDiabetes ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>Weight Loss</button>
-                <button onClick={() => setSelectedProgram('diabetes')} className={`rounded-md px-3 py-1 text-xs font-medium ${isDiabetes && !isWeightLoss ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>Diabetes</button>
+                <button onClick={() => setViewMode('weight-loss')} className={`rounded-md px-3 py-1 text-xs font-medium ${viewMode === 'weight-loss' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>Weight Loss</button>
+                <button onClick={() => setViewMode('diabetes')} className={`rounded-md px-3 py-1 text-xs font-medium ${viewMode === 'diabetes' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>Diabetes</button>
               </div>
             )}
           </div>
