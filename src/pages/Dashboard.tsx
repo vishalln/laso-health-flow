@@ -119,7 +119,7 @@ export default function Dashboard() {
 
         {/* Charts */}
         <div className="mt-6 grid gap-6 lg:grid-cols-2">
-          {(isWeightLoss || selectedProgram === 'both') && (
+          {showWeightLoss && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base"><TrendingDown className="h-4 w-4 text-primary" /> Weight Progress</CardTitle>
@@ -140,7 +140,7 @@ export default function Dashboard() {
             </Card>
           )}
 
-          {(isDiabetes || selectedProgram === 'both') && (
+          {showDiabetes && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base"><Activity className="h-4 w-4 text-primary" /> Blood Sugar & HbA1c</CardTitle>
