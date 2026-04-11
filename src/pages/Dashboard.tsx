@@ -40,9 +40,9 @@ export default function Dashboard() {
     );
   }
 
-  const isWeightLoss = selectedProgram === 'weight-loss' || selectedProgram === 'both';
-  const isDiabetes = selectedProgram === 'diabetes' || selectedProgram === 'both';
-  const prescription = isWeightLoss ? weightLossPrescription : diabetesPrescription;
+  const showWeightLoss = selectedProgram === 'both' ? viewMode === 'weight-loss' : selectedProgram === 'weight-loss';
+  const showDiabetes = selectedProgram === 'both' ? viewMode === 'diabetes' : selectedProgram === 'diabetes';
+  const prescription = showWeightLoss ? weightLossPrescription : diabetesPrescription;
 
   return (
     <div className="min-h-screen">
