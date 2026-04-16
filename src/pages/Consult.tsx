@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Star, Video, CheckCircle2, Mail, Phone, Clock, Calendar, ArrowRight } from 'lucide-react';
+import { Star, Video, CheckCircle2, Mail, Phone, Clock, Calendar, ArrowRight, FileText, AlertTriangle } from 'lucide-react';
 import { format, addDays } from 'date-fns';
 
 const timeSlots = ['10:00 AM', '11:30 AM', '2:00 PM', '4:30 PM', '6:00 PM'];
@@ -22,7 +22,7 @@ const bookedSlots: Record<string, string[]> = {
 };
 
 export default function Consult() {
-  const { setBooking } = useUser();
+  const { setBooking, quizData } = useUser();
   const [selectedDoctor, setSelectedDoctor] = useState<Doctor | null>(null);
   const [selectedDay, setSelectedDay] = useState(0);
   const [selectedTime, setSelectedTime] = useState('');
@@ -107,7 +107,7 @@ export default function Consult() {
               <p className="text-xs text-muted-foreground">From: Laso Health &lt;appointments@laso.health&gt;</p>
               <p className="text-xs text-muted-foreground">Subject: Your consultation with {selectedDoctor.name} is confirmed</p>
               <hr className="my-3 border-border" />
-              <p className="font-medium">Hello Arjun,</p>
+              <p className="font-medium">Hello {quizData?.gender === 'Male' ? 'Mr.' : quizData?.gender === 'Female' ? 'Ms.' : ''} Patient,</p>
               <p className="mt-2 text-muted-foreground">Your video consultation has been confirmed:</p>
               <ul className="mt-2 space-y-1 text-muted-foreground">
                 <li><strong>Doctor:</strong> {selectedDoctor.name}</li>
@@ -133,6 +133,40 @@ export default function Consult() {
         <div className="mx-auto max-w-3xl">
           <h1 className="text-2xl font-bold text-foreground md:text-3xl">Book Your Consultation</h1>
           <p className="mt-2 text-muted-foreground">Choose a physician and select a time that works for you.</p>
+
+          {/* Pre-Consult Summary */}
+          {quizData && (
+            <Card className="mt-6 border-primary/20 bg-primary/5">
+              <CardContent className="py-4">
+                <div className="flex items-start gap-3">
+                  <FileText className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">Pre-Consultation Summary</p>
+                    <p className="mt-1 text-xs text-muted-foreground">This profile will be shared with your doctor before the call.</p>
+                    <div className="mt-3 grid grid-cols-2 gap-x-6 gap-y-1 text-xs">
+                      <p className="text-muted-foreground">Age: <span className="text-foreground">{quizData.age}</span></p>
+                      <p className="text-muted-foreground">Gender: <span className="text-foreground">{quizData.gender}</span></p>
+                      <p className="text-muted-foreground">BMI: <span className="text-foreground">{quizData.bmi}</span></p>
+                      <p className="text-muted-foreground">Program: <span className="text-foreground">{quizData.program === 'weight-loss' ? 'Weight Loss' : quizData.program === 'diabetes' ? 'Diabetes' : 'Both'}</span></p>
+                      {quizData.conditions.length > 0 && (
+                        <p className="col-span-2 text-muted-foreground">Conditions: <span className="text-foreground">{quizData.conditions.join(', ')}</span></p>
+                      )}
+                      {quizData.hba1c && (
+                        <p className="text-muted-foreground">HbA1c: <span className="text-foreground">{quizData.hba1c}%</span></p>
+                      )}
+                    </div>
+                    {/* Risk flags */}
+                    {(quizData.conditions.includes('Heart disease') || quizData.conditions.includes('Kidney disease')) && (
+                      <div className="mt-3 flex items-start gap-2 rounded-md bg-accent/10 p-2">
+                        <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent" />
+                        <p className="text-[11px] text-accent">Flagged for additional screening — your doctor will discuss this during the consultation.</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Doctor cards */}
           <div className="mt-8 grid gap-4 md:grid-cols-3">

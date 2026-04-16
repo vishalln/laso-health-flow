@@ -8,23 +8,39 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { weightLossPrescription, diabetesPrescription, bloodSugarData, hba1cData } from '@/data/medications';
+import { doctorNotes, treatmentPlan, consultHistory, refillStatus } from '@/data/clinicalArtifacts';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, ReferenceLine } from 'recharts';
 import { Pill, Calendar, Video, ClipboardCheck, Bell, Activity } from 'lucide-react';
 
-// New clinical components
 import { useSimulation } from '@/hooks/useSimulation';
 import { usePatientAnalytics } from '@/hooks/usePatientAnalytics';
-import ClinicalInsightsCard from '@/components/dashboard/ClinicalInsightsCard';
+
+// Level 1 — Immediate Attention
+import MetabolicHealthScore from '@/components/dashboard/MetabolicHealthScore';
+import EscalationAlerts from '@/components/dashboard/EscalationAlerts';
+
+// Level 2 — Action
 import NextBestActionCard from '@/components/dashboard/NextBestActionCard';
 import DoseOptimizationCard from '@/components/dashboard/DoseOptimizationCard';
+import DailyCheckIn from '@/components/dashboard/DailyCheckIn';
+import RefillEngine from '@/components/dashboard/RefillEngine';
+
+// Level 3 — Understanding
+import ClinicalInsightsCard from '@/components/dashboard/ClinicalInsightsCard';
+import WeeklyReview from '@/components/dashboard/WeeklyReview';
+import GLP1AdherenceScore from '@/components/dashboard/GLP1AdherenceScore';
+
+// Level 4 — Data
+import OutcomeComparisonChart from '@/components/dashboard/OutcomeComparisonChart';
 import PlateauDetector from '@/components/dashboard/PlateauDetector';
 import SideEffectTracker from '@/components/dashboard/SideEffectTracker';
-import GLP1AdherenceScore from '@/components/dashboard/GLP1AdherenceScore';
-import OutcomeComparisonChart from '@/components/dashboard/OutcomeComparisonChart';
-import MetabolicHealthScore from '@/components/dashboard/MetabolicHealthScore';
 import AppetiteSignalTracker from '@/components/dashboard/AppetiteSignalTracker';
-import EscalationAlerts from '@/components/dashboard/EscalationAlerts';
+
+// Level 5 — Detail
 import TimelineView from '@/components/dashboard/TimelineView';
+import DoctorNotesCard from '@/components/dashboard/DoctorNotesCard';
+import TreatmentPlanCard from '@/components/dashboard/TreatmentPlanCard';
+import ConsultHistoryCard from '@/components/dashboard/ConsultHistoryCard';
 import SimulationControls from '@/components/dashboard/SimulationControls';
 
 export default function Dashboard() {
@@ -33,6 +49,7 @@ export default function Dashboard() {
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [viewMode, setViewMode] = useState<'weight-loss' | 'diabetes'>(selectedProgram === 'diabetes' ? 'diabetes' : 'weight-loss');
+  const [activeTab, setActiveTab] = useState('overview');
 
   const sim = useSimulation();
   const analytics = usePatientAnalytics(sim.data);
@@ -59,31 +76,24 @@ export default function Dashboard() {
     );
   }
 
-  const showWeightLoss = selectedProgram === 'both' ? viewMode === 'weight-loss' : selectedProgram === 'weight-loss';
   const showDiabetes = selectedProgram === 'both' ? viewMode === 'diabetes' : selectedProgram === 'diabetes';
-  const prescription = showWeightLoss ? weightLossPrescription : diabetesPrescription;
+  const prescription = viewMode === 'weight-loss' ? weightLossPrescription : diabetesPrescription;
+  const prevWeek = sim.data.length >= 2 ? sim.data[sim.data.length - 2] : sim.data[0];
 
   return (
     <div className="min-h-screen">
       <Navbar />
-      <div className="container py-8">
-        {/* Simulation Controls — always at top for demo */}
-        <SimulationControls
-          onSimulateWeek={sim.simulateWeek}
-          onMissDoses={sim.simulateMissedDoses}
-          onIncreaseSideEffects={sim.simulateSideEffects}
-          onReset={sim.reset}
-          onMarkDose={sim.markDose}
-          log={sim.simulationLog}
-        />
-
-        {/* Welcome */}
-        <div className="mt-6 mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="container py-6">
+        {/* Header */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Welcome back, {userName}</h1>
-            <Badge variant="secondary" className="mt-1">{selectedProgram === 'weight-loss' ? 'Weight Loss' : selectedProgram === 'diabetes' ? 'Diabetes Management' : 'Weight Loss & Diabetes'} Program</Badge>
+            <div className="mt-1 flex items-center gap-2">
+              <Badge variant="secondary">{selectedProgram === 'weight-loss' ? 'Weight Loss' : selectedProgram === 'diabetes' ? 'Diabetes Management' : 'Weight Loss & Diabetes'}</Badge>
+              <span className="text-xs text-muted-foreground">Week {analytics.currentWeek.week} · {analytics.currentWeek.doseMg}mg</span>
+            </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
             {selectedProgram === 'both' && (
               <div className="flex rounded-lg border border-border bg-card p-0.5">
                 <button onClick={() => setViewMode('weight-loss')} className={`rounded-md px-3 py-1 text-xs font-medium ${viewMode === 'weight-loss' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>Weight Loss</button>
@@ -93,139 +103,204 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Escalation Alerts — top priority */}
-        <EscalationAlerts
-          insights={analytics.insights}
-          adherenceScore={analytics.adherenceScore}
-          plateau={analytics.plateau}
-          sideEffects={analytics.currentWeek.sideEffects}
-        />
-
-        {/* Row 1: Metabolic Score + Adherence + Dose */}
-        <div className="mt-6 grid gap-6 md:grid-cols-3">
-          <MetabolicHealthScore score={analytics.metabolicScore.score} previousScore={analytics.metabolicScore.previousScore} change={analytics.metabolicScore.change} />
-          <GLP1AdherenceScore score={analytics.adherenceScore} dosesTaken={analytics.currentWeek.dosesTaken} dosesScheduled={analytics.currentWeek.dosesScheduled} />
-          <DoseOptimizationCard recommendation={analytics.doseRecommendation} />
+        {/* Simulation Controls */}
+        <div className="mt-4">
+          <SimulationControls
+            onSimulateWeek={sim.simulateWeek}
+            onMissDoses={sim.simulateMissedDoses}
+            onIncreaseSideEffects={sim.simulateSideEffects}
+            onReset={sim.reset}
+            onMarkDose={sim.markDose}
+            log={sim.simulationLog}
+          />
         </div>
 
-        {/* Row 2: Clinical Insights + Next Best Actions */}
-        <div className="mt-6 grid gap-6 lg:grid-cols-2">
-          <ClinicalInsightsCard insights={analytics.insights} />
-          <NextBestActionCard actions={analytics.nextActions} />
-        </div>
+        {/* Navigation tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-6">
+          <TabsList className="w-full justify-start">
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="clinical">Clinical</TabsTrigger>
+            <TabsTrigger value="treatment">Treatment Plan</TabsTrigger>
+            <TabsTrigger value="history">History</TabsTrigger>
+          </TabsList>
 
-        {/* Row 3: Charts — Expected vs Actual + Plateau */}
-        <div className="mt-6 grid gap-6 lg:grid-cols-2">
-          <OutcomeComparisonChart data={sim.data} />
-          <PlateauDetector plateau={analytics.plateau} />
-        </div>
+          {/* ===== OVERVIEW TAB ===== */}
+          <TabsContent value="overview" className="mt-6 space-y-6">
+            {/* LEVEL 1: Immediate Attention */}
+            <EscalationAlerts
+              insights={analytics.insights}
+              adherenceScore={analytics.adherenceScore}
+              plateau={analytics.plateau}
+              sideEffects={analytics.currentWeek.sideEffects}
+            />
 
-        {/* Row 4: Side Effects + Appetite */}
-        <div className="mt-6 grid gap-6 lg:grid-cols-2">
-          <SideEffectTracker currentEffects={analytics.currentWeek.sideEffects} onLogSymptom={sim.logSymptom} />
-          <AppetiteSignalTracker current={analytics.currentWeek.appetite} history={analytics.allData.map(w => w.appetite)} onLog={sim.logAppetite} />
-        </div>
+            {/* Daily Check-In + Metabolic Score + Refill */}
+            <div className="grid gap-4 md:grid-cols-3">
+              <DailyCheckIn
+                onLogWeight={() => {}}
+                onLogSymptom={sim.logSymptom}
+                onLogAppetite={sim.logAppetite}
+                onMarkDose={sim.markDose}
+                currentWeight={analytics.currentWeek.weight}
+              />
+              <MetabolicHealthScore
+                score={analytics.metabolicScore.score}
+                previousScore={analytics.metabolicScore.previousScore}
+                change={analytics.metabolicScore.change}
+              />
+              <RefillEngine refill={refillStatus} />
+            </div>
 
-        {/* Row 5: Prescription + Upcoming */}
-        <div className="mt-6 grid gap-6 lg:grid-cols-3">
-          <Card className="lg:col-span-2">
-            <CardHeader className="flex flex-row items-center gap-2">
-              <Pill className="h-5 w-5 text-primary" />
-              <div>
-                <CardTitle className="text-base">Current Prescription</CardTitle>
-                <p className="text-xs text-muted-foreground">As prescribed by {prescription.doctorName}</p>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {prescription.medications.map((med, i) => (
-                  <div key={i} className="rounded-lg border border-border p-4">
-                    <div className="flex items-center justify-between">
-                      <h4 className="font-semibold text-foreground">{med.name}</h4>
-                      <Badge>{med.currentDose}</Badge>
+            {/* LEVEL 2: Action */}
+            <div className="grid gap-6 lg:grid-cols-2">
+              <NextBestActionCard actions={analytics.nextActions} />
+              <DoseOptimizationCard recommendation={analytics.doseRecommendation} />
+            </div>
+
+            {/* LEVEL 3: Understanding */}
+            <WeeklyReview
+              currentWeek={analytics.currentWeek}
+              previousWeek={prevWeek}
+              totalLoss={analytics.totalWeightLoss}
+              totalLossPct={analytics.totalWeightLossPct}
+              adherenceScore={analytics.adherenceScore}
+            />
+
+            <div className="grid gap-6 lg:grid-cols-2">
+              <ClinicalInsightsCard insights={analytics.insights} />
+              <GLP1AdherenceScore
+                score={analytics.adherenceScore}
+                dosesTaken={analytics.currentWeek.dosesTaken}
+                dosesScheduled={analytics.currentWeek.dosesScheduled}
+              />
+            </div>
+
+            {/* LEVEL 4: Data */}
+            <div className="grid gap-6 lg:grid-cols-2">
+              <OutcomeComparisonChart data={sim.data} />
+              <PlateauDetector plateau={analytics.plateau} />
+            </div>
+
+            <div className="grid gap-6 lg:grid-cols-2">
+              <SideEffectTracker currentEffects={analytics.currentWeek.sideEffects} onLogSymptom={sim.logSymptom} />
+              <AppetiteSignalTracker current={analytics.currentWeek.appetite} history={analytics.allData.map(w => w.appetite)} onLog={sim.logAppetite} />
+            </div>
+
+            {/* Diabetes charts */}
+            {showDiabetes && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base"><Activity className="h-4 w-4 text-primary" /> Blood Sugar & HbA1c</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Tabs defaultValue="daily">
+                    <TabsList className="mb-4">
+                      <TabsTrigger value="daily">Daily Glucose</TabsTrigger>
+                      <TabsTrigger value="hba1c">HbA1c Trend</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="daily">
+                      <ResponsiveContainer width="100%" height={220}>
+                        <LineChart data={bloodSugarData}>
+                          <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                          <XAxis dataKey="day" tick={{ fontSize: 10 }} className="fill-muted-foreground" />
+                          <YAxis domain={[100, 190]} tick={{ fontSize: 11 }} className="fill-muted-foreground" />
+                          <Tooltip />
+                          <ReferenceLine y={130} stroke="hsl(160, 84%, 39%)" strokeDasharray="4 4" label={{ value: 'Target', fontSize: 10 }} />
+                          <Line type="monotone" dataKey="fasting" stroke="hsl(168, 80%, 32%)" strokeWidth={2} dot={{ r: 3 }} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </TabsContent>
+                    <TabsContent value="hba1c">
+                      <ResponsiveContainer width="100%" height={220}>
+                        <BarChart data={hba1cData}>
+                          <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                          <XAxis dataKey="period" tick={{ fontSize: 11 }} className="fill-muted-foreground" />
+                          <YAxis domain={[6, 9]} tick={{ fontSize: 11 }} className="fill-muted-foreground" />
+                          <Tooltip />
+                          <ReferenceLine y={7} stroke="hsl(160, 84%, 39%)" strokeDasharray="4 4" label={{ value: 'Target', fontSize: 10 }} />
+                          <Bar dataKey="value" fill="hsl(168, 80%, 32%)" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                      <p className="mt-2 text-xs text-muted-foreground">HbA1c reflects average blood sugar over 2–3 months.</p>
+                    </TabsContent>
+                  </Tabs>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          {/* ===== CLINICAL TAB ===== */}
+          <TabsContent value="clinical" className="mt-6 space-y-6">
+            <div className="grid gap-6 lg:grid-cols-2">
+              <DoctorNotesCard notes={doctorNotes} />
+              <div className="space-y-6">
+                <ConsultHistoryCard records={consultHistory} />
+                {/* Prescription */}
+                <Card>
+                  <CardHeader className="flex flex-row items-center gap-2">
+                    <Pill className="h-5 w-5 text-primary" />
+                    <div>
+                      <CardTitle className="text-base">Current Prescription</CardTitle>
+                      <p className="text-xs text-muted-foreground">As prescribed by {prescription.doctorName}</p>
                     </div>
-                    {med.targetDose !== med.currentDose && <p className="mt-1 text-xs text-muted-foreground">Target dose: {med.targetDose}</p>}
-                    <p className="mt-2 text-sm text-muted-foreground">{med.schedule}</p>
-                    <div className="mt-3 flex flex-wrap gap-3 text-xs text-muted-foreground">
-                      <span>Started {med.startedWeeksAgo} weeks ago</span>
-                      <span>Next escalation: {med.nextEscalation}</span>
-                      <span>Refill: {med.nextRefill}</span>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {prescription.medications.map((med, i) => (
+                        <div key={i} className="rounded-lg border border-border p-4">
+                          <div className="flex items-center justify-between">
+                            <h4 className="font-semibold text-foreground">{med.name}</h4>
+                            <Badge>{med.currentDose}</Badge>
+                          </div>
+                          {med.targetDose !== med.currentDose && <p className="mt-1 text-xs text-muted-foreground">Target dose: {med.targetDose}</p>}
+                          <p className="mt-2 text-sm text-muted-foreground">{med.schedule}</p>
+                          <div className="mt-3 flex flex-wrap gap-3 text-xs text-muted-foreground">
+                            <span>Started {med.startedWeeksAgo} weeks ago</span>
+                            <span>Next escalation: {med.nextEscalation}</span>
+                            <span>Refill: {med.nextRefill}</span>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  </div>
-                ))}
+                    <p className="mt-4 text-xs text-muted-foreground italic">{prescription.note}</p>
+                  </CardContent>
+                </Card>
               </div>
-              <p className="mt-4 text-xs text-muted-foreground italic">{prescription.note}</p>
-            </CardContent>
-          </Card>
+            </div>
+          </TabsContent>
 
-          <div className="space-y-4">
-            <Card>
-              <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Calendar className="h-4 w-4 text-primary" /> Upcoming</CardTitle></CardHeader>
-              <CardContent className="space-y-3">
-                <ActionCard icon={<Video className="h-4 w-4" />} title="Next consultation" sub="Dr. Sharma · April 28 · 4:30 PM" linkText="Join Zoom" />
-                <ActionCard icon={<ClipboardCheck className="h-4 w-4" />} title="Weekly check-in due" sub="Log your weight and any symptoms" />
-                <ActionCard icon={<Activity className="h-4 w-4" />} title="Blood work reminder" sub="Schedule fasting glucose test" />
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Bell className="h-4 w-4 text-primary" /> Recent Activity</CardTitle></CardHeader>
-              <CardContent className="space-y-2 text-sm text-muted-foreground">
-                <p>✅ Medication reminder sent — 8:45 AM today</p>
-                <p>✅ Weekly check-in completed — 2 days ago</p>
-                <p>✅ Consultation reminder call — completed yesterday</p>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+          {/* ===== TREATMENT PLAN TAB ===== */}
+          <TabsContent value="treatment" className="mt-6">
+            <TreatmentPlanCard plan={treatmentPlan} />
+          </TabsContent>
 
-        {/* Diabetes-specific charts */}
-        {showDiabetes && (
-          <div className="mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base"><Activity className="h-4 w-4 text-primary" /> Blood Sugar & HbA1c</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Tabs defaultValue="daily">
-                  <TabsList className="mb-4">
-                    <TabsTrigger value="daily">Daily Glucose</TabsTrigger>
-                    <TabsTrigger value="hba1c">HbA1c Trend</TabsTrigger>
-                  </TabsList>
-                  <TabsContent value="daily">
-                    <ResponsiveContainer width="100%" height={220}>
-                      <LineChart data={bloodSugarData}>
-                        <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                        <XAxis dataKey="day" tick={{ fontSize: 10 }} className="fill-muted-foreground" />
-                        <YAxis domain={[100, 190]} tick={{ fontSize: 11 }} className="fill-muted-foreground" />
-                        <Tooltip />
-                        <ReferenceLine y={130} stroke="hsl(160, 84%, 39%)" strokeDasharray="4 4" label={{ value: 'Target', fontSize: 10 }} />
-                        <Line type="monotone" dataKey="fasting" stroke="hsl(168, 80%, 32%)" strokeWidth={2} dot={{ r: 3 }} />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </TabsContent>
-                  <TabsContent value="hba1c">
-                    <ResponsiveContainer width="100%" height={220}>
-                      <BarChart data={hba1cData}>
-                        <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                        <XAxis dataKey="period" tick={{ fontSize: 11 }} className="fill-muted-foreground" />
-                        <YAxis domain={[6, 9]} tick={{ fontSize: 11 }} className="fill-muted-foreground" />
-                        <Tooltip />
-                        <ReferenceLine y={7} stroke="hsl(160, 84%, 39%)" strokeDasharray="4 4" label={{ value: 'Target', fontSize: 10 }} />
-                        <Bar dataKey="value" fill="hsl(168, 80%, 32%)" radius={[4, 4, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                    <p className="mt-2 text-xs text-muted-foreground">HbA1c reflects average blood sugar over 2–3 months.</p>
-                  </TabsContent>
-                </Tabs>
-              </CardContent>
-            </Card>
-          </div>
-        )}
+          {/* ===== HISTORY TAB ===== */}
+          <TabsContent value="history" className="mt-6 space-y-6">
+            <TimelineView data={sim.data} />
 
-        {/* Timeline */}
-        <div className="mt-6">
-          <TimelineView data={sim.data} />
-        </div>
+            {/* Upcoming + Activity */}
+            <div className="grid gap-6 lg:grid-cols-2">
+              <Card>
+                <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Calendar className="h-4 w-4 text-primary" /> Upcoming</CardTitle></CardHeader>
+                <CardContent className="space-y-3">
+                  <ActionCard icon={<Video className="h-4 w-4" />} title="Next consultation" sub="Dr. Sharma · April 28 · 4:30 PM" linkText="Join Zoom" />
+                  <ActionCard icon={<ClipboardCheck className="h-4 w-4" />} title="Weekly check-in due" sub="Log your weight and any symptoms" />
+                  <ActionCard icon={<Activity className="h-4 w-4" />} title="Blood work reminder" sub="Schedule fasting glucose test" />
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Bell className="h-4 w-4 text-primary" /> Recent Activity</CardTitle></CardHeader>
+                <CardContent className="space-y-2 text-sm text-muted-foreground">
+                  <p>✅ Medication reminder sent — 8:45 AM today</p>
+                  <p>✅ Weekly check-in completed — 2 days ago</p>
+                  <p>✅ Consultation reminder call — completed yesterday</p>
+                  <p>📦 Medication refill ships April 22</p>
+                  <p>📊 HbA1c recheck due — May 2026</p>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+        </Tabs>
 
         <div className="mt-8 flex gap-3">
           <Button variant="outline" onClick={() => navigate('/support')}>Chat Support</Button>
