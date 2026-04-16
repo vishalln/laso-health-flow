@@ -7,9 +7,25 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { weightLossPrescription, diabetesPrescription, weightData, bloodSugarData, hba1cData } from '@/data/medications';
+import { weightLossPrescription, diabetesPrescription, bloodSugarData, hba1cData } from '@/data/medications';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, ReferenceLine } from 'recharts';
-import { Pill, Calendar, Video, ClipboardCheck, Bell, TrendingDown, Activity } from 'lucide-react';
+import { Pill, Calendar, Video, ClipboardCheck, Bell, Activity } from 'lucide-react';
+
+// New clinical components
+import { useSimulation } from '@/hooks/useSimulation';
+import { usePatientAnalytics } from '@/hooks/usePatientAnalytics';
+import ClinicalInsightsCard from '@/components/dashboard/ClinicalInsightsCard';
+import NextBestActionCard from '@/components/dashboard/NextBestActionCard';
+import DoseOptimizationCard from '@/components/dashboard/DoseOptimizationCard';
+import PlateauDetector from '@/components/dashboard/PlateauDetector';
+import SideEffectTracker from '@/components/dashboard/SideEffectTracker';
+import GLP1AdherenceScore from '@/components/dashboard/GLP1AdherenceScore';
+import OutcomeComparisonChart from '@/components/dashboard/OutcomeComparisonChart';
+import MetabolicHealthScore from '@/components/dashboard/MetabolicHealthScore';
+import AppetiteSignalTracker from '@/components/dashboard/AppetiteSignalTracker';
+import EscalationAlerts from '@/components/dashboard/EscalationAlerts';
+import TimelineView from '@/components/dashboard/TimelineView';
+import SimulationControls from '@/components/dashboard/SimulationControls';
 
 export default function Dashboard() {
   const { isLoggedIn, userName, selectedProgram, setIsLoggedIn, setUserName } = useUser();
@@ -17,6 +33,9 @@ export default function Dashboard() {
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [viewMode, setViewMode] = useState<'weight-loss' | 'diabetes'>(selectedProgram === 'diabetes' ? 'diabetes' : 'weight-loss');
+
+  const sim = useSimulation();
+  const analytics = usePatientAnalytics(sim.data);
 
   if (!isLoggedIn) {
     return (
@@ -48,8 +67,18 @@ export default function Dashboard() {
     <div className="min-h-screen">
       <Navbar />
       <div className="container py-8">
+        {/* Simulation Controls — always at top for demo */}
+        <SimulationControls
+          onSimulateWeek={sim.simulateWeek}
+          onMissDoses={sim.simulateMissedDoses}
+          onIncreaseSideEffects={sim.simulateSideEffects}
+          onReset={sim.reset}
+          onMarkDose={sim.markDose}
+          log={sim.simulationLog}
+        />
+
         {/* Welcome */}
-        <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mt-6 mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Welcome back, {userName}</h1>
             <Badge variant="secondary" className="mt-1">{selectedProgram === 'weight-loss' ? 'Weight Loss' : selectedProgram === 'diabetes' ? 'Diabetes Management' : 'Weight Loss & Diabetes'} Program</Badge>
@@ -64,8 +93,41 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-3">
-          {/* Prescription */}
+        {/* Escalation Alerts — top priority */}
+        <EscalationAlerts
+          insights={analytics.insights}
+          adherenceScore={analytics.adherenceScore}
+          plateau={analytics.plateau}
+          sideEffects={analytics.currentWeek.sideEffects}
+        />
+
+        {/* Row 1: Metabolic Score + Adherence + Dose */}
+        <div className="mt-6 grid gap-6 md:grid-cols-3">
+          <MetabolicHealthScore score={analytics.metabolicScore.score} previousScore={analytics.metabolicScore.previousScore} change={analytics.metabolicScore.change} />
+          <GLP1AdherenceScore score={analytics.adherenceScore} dosesTaken={analytics.currentWeek.dosesTaken} dosesScheduled={analytics.currentWeek.dosesScheduled} />
+          <DoseOptimizationCard recommendation={analytics.doseRecommendation} />
+        </div>
+
+        {/* Row 2: Clinical Insights + Next Best Actions */}
+        <div className="mt-6 grid gap-6 lg:grid-cols-2">
+          <ClinicalInsightsCard insights={analytics.insights} />
+          <NextBestActionCard actions={analytics.nextActions} />
+        </div>
+
+        {/* Row 3: Charts — Expected vs Actual + Plateau */}
+        <div className="mt-6 grid gap-6 lg:grid-cols-2">
+          <OutcomeComparisonChart data={sim.data} />
+          <PlateauDetector plateau={analytics.plateau} />
+        </div>
+
+        {/* Row 4: Side Effects + Appetite */}
+        <div className="mt-6 grid gap-6 lg:grid-cols-2">
+          <SideEffectTracker currentEffects={analytics.currentWeek.sideEffects} onLogSymptom={sim.logSymptom} />
+          <AppetiteSignalTracker current={analytics.currentWeek.appetite} history={analytics.allData.map(w => w.appetite)} onLog={sim.logAppetite} />
+        </div>
+
+        {/* Row 5: Prescription + Upcoming */}
+        <div className="mt-6 grid gap-6 lg:grid-cols-3">
           <Card className="lg:col-span-2">
             <CardHeader className="flex flex-row items-center gap-2">
               <Pill className="h-5 w-5 text-primary" />
@@ -96,7 +158,6 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
-          {/* Upcoming actions */}
           <div className="space-y-4">
             <Card>
               <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Calendar className="h-4 w-4 text-primary" /> Upcoming</CardTitle></CardHeader>
@@ -117,30 +178,9 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Charts */}
-        <div className="mt-6 grid gap-6 lg:grid-cols-2">
-          {showWeightLoss && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base"><TrendingDown className="h-4 w-4 text-primary" /> Weight Progress</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={250}>
-                  <LineChart data={weightData}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                    <XAxis dataKey="week" tick={{ fontSize: 11 }} className="fill-muted-foreground" />
-                    <YAxis domain={['dataMin - 1', 'dataMax + 1']} tick={{ fontSize: 11 }} className="fill-muted-foreground" />
-                    <Tooltip />
-                    <Line type="monotone" dataKey="weight" stroke="hsl(168, 80%, 32%)" strokeWidth={2} dot={{ r: 3 }} />
-                  </LineChart>
-                </ResponsiveContainer>
-                <p className="mt-3 text-sm font-medium text-foreground">5.5 kg lost (6.0% of starting weight)</p>
-                <p className="mt-1 text-xs text-muted-foreground">Weight fluctuations are normal. Trends over weeks matter more than daily changes.</p>
-              </CardContent>
-            </Card>
-          )}
-
-          {showDiabetes && (
+        {/* Diabetes-specific charts */}
+        {showDiabetes && (
+          <div className="mt-6">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base"><Activity className="h-4 w-4 text-primary" /> Blood Sugar & HbA1c</CardTitle>
@@ -174,12 +214,17 @@ export default function Dashboard() {
                         <Bar dataKey="value" fill="hsl(168, 80%, 32%)" radius={[4, 4, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
-                    <p className="mt-2 text-xs text-muted-foreground">HbA1c reflects average blood sugar over 2–3 months. Changes take time to appear.</p>
+                    <p className="mt-2 text-xs text-muted-foreground">HbA1c reflects average blood sugar over 2–3 months.</p>
                   </TabsContent>
                 </Tabs>
               </CardContent>
             </Card>
-          )}
+          </div>
+        )}
+
+        {/* Timeline */}
+        <div className="mt-6">
+          <TimelineView data={sim.data} />
         </div>
 
         <div className="mt-8 flex gap-3">
