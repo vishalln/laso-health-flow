@@ -10,7 +10,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { ArrowRight, ArrowLeft, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { ArrowRight, ArrowLeft, AlertTriangle, CheckCircle2, Info } from 'lucide-react';
 
 const conditionsList = ['Type 2 Diabetes', 'Hypertension', 'PCOS', 'Thyroid disorder', 'Heart disease', 'Kidney disease', 'Liver disease'];
 
@@ -63,16 +64,57 @@ export default function Quiz() {
     setStep(totalSteps + 1);
   };
 
+  // Real-time interpretation helpers
+  const getAgeInterpretation = () => {
+    const a = Number(age);
+    if (!a) return null;
+    if (a < 18) return { text: 'This program is available for adults aged 18 and above.', severity: 'destructive' as const };
+    if (a >= 18 && a <= 30) return { text: 'GLP-1 medications are typically well-tolerated in younger adults. Your doctor will assess suitability.', severity: 'muted' as const };
+    if (a >= 31 && a <= 55) return { text: 'This age group has the most clinical trial data supporting GLP-1 therapy for weight management.', severity: 'muted' as const };
+    if (a >= 56) return { text: 'Additional monitoring may be recommended for patients above 55. Your doctor will discuss this.', severity: 'muted' as const };
+    return null;
+  };
+
+  const getBMIInterpretation = () => {
+    if (!bmi || !bmiInfo) return null;
+    const interpretations: string[] = [];
+    if (bmi >= 30) {
+      interpretations.push('You may benefit from GLP-1 therapy. In clinical trials, patients with BMI ≥30 showed the most significant weight loss.');
+    } else if (bmi >= 27) {
+      interpretations.push('GLP-1 medications may be considered if you have at least one weight-related comorbidity (e.g., Type 2 diabetes, hypertension).');
+    } else if (bmi >= 25) {
+      interpretations.push('Based on your BMI, medication may not be the first recommendation. Your doctor can discuss lifestyle-based approaches.');
+    }
+    return interpretations;
+  };
+
+  const getConditionInterpretation = () => {
+    const flags: string[] = [];
+    if (conditions.includes('Heart disease')) flags.push('Heart disease requires additional screening before starting GLP-1 therapy.');
+    if (conditions.includes('Kidney disease')) flags.push('Renal function will be assessed — dose adjustments may be needed.');
+    if (conditions.includes('Liver disease')) flags.push('Liver function tests may be required before prescribing.');
+    if (conditions.includes('Type 2 Diabetes') && program === 'weight-loss') flags.push('Your Type 2 Diabetes will be factored into your treatment plan — GLP-1 medications can address both weight and blood sugar.');
+    if (conditions.includes('PCOS')) flags.push('PCOS is commonly associated with insulin resistance. GLP-1 therapy may provide dual benefit.');
+    return flags;
+  };
+
   const renderStep = () => {
     switch (step) {
-      case 1:
+      case 1: {
+        const ageInterp = getAgeInterpretation();
         return (
           <div className="space-y-4">
             <Label htmlFor="age">How old are you?</Label>
             <Input id="age" type="number" min={18} max={75} placeholder="e.g. 35" value={age} onChange={e => setAge(e.target.value)} />
-            {Number(age) > 0 && Number(age) < 18 && <p className="text-sm text-destructive">This program is available for adults aged 18 and above.</p>}
+            {ageInterp && (
+              <div className={`flex items-start gap-2 rounded-lg p-3 ${ageInterp.severity === 'destructive' ? 'bg-destructive/10' : 'bg-muted'}`}>
+                <Info className={`mt-0.5 h-4 w-4 shrink-0 ${ageInterp.severity === 'destructive' ? 'text-destructive' : 'text-muted-foreground'}`} />
+                <p className={`text-xs ${ageInterp.severity === 'destructive' ? 'text-destructive' : 'text-muted-foreground'}`}>{ageInterp.text}</p>
+              </div>
+            )}
           </div>
         );
+      }
       case 2:
         return (
           <div className="space-y-4">
@@ -85,9 +127,16 @@ export default function Quiz() {
                 </button>
               ))}
             </div>
+            {gender && (
+              <div className="flex items-start gap-2 rounded-lg bg-muted p-3">
+                <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                <p className="text-xs text-muted-foreground">Gender is used for clinical context — certain dosing and risk factors vary by biological sex.</p>
+              </div>
+            )}
           </div>
         );
-      case 3:
+      case 3: {
+        const bmiInterps = getBMIInterpretation();
         return (
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
@@ -101,32 +150,60 @@ export default function Quiz() {
               </div>
             </div>
             {bmi > 0 && bmiInfo && (
-              <div className="rounded-lg bg-muted p-4">
-                <p className="text-sm font-medium text-foreground">Your BMI: <span className={bmiInfo.color}>{bmi} ({bmiInfo.label})</span></p>
-                {bmi < 25 && <p className="mt-2 text-xs text-muted-foreground">Based on your BMI, you may not be eligible for weight loss medication. A doctor can discuss other options during consultation.</p>}
+              <div className="space-y-3">
+                <div className="rounded-lg bg-muted p-4">
+                  <p className="text-sm font-medium text-foreground">Your BMI: <span className={bmiInfo.color}>{bmi} ({bmiInfo.label})</span></p>
+                  {/* BMI scale visualization */}
+                  <div className="mt-3">
+                    <div className="flex text-[10px] text-muted-foreground">
+                      <span className="flex-1">Underweight</span>
+                      <span className="flex-1 text-center">Normal</span>
+                      <span className="flex-1 text-center">Overweight</span>
+                      <span className="flex-1 text-right">Obese</span>
+                    </div>
+                    <div className="mt-1 flex h-2 overflow-hidden rounded-full">
+                      <div className="w-[18%] bg-blue-400" />
+                      <div className="w-[25%] bg-success" />
+                      <div className="w-[20%] bg-accent" />
+                      <div className="flex-1 bg-destructive" />
+                    </div>
+                    <div className="relative mt-1">
+                      <div className="absolute h-3 w-0.5 bg-foreground" style={{ left: `${Math.min(Math.max((bmi - 15) / 25 * 100, 0), 100)}%` }} />
+                    </div>
+                  </div>
+                </div>
+                {bmiInterps && bmiInterps.map((interp, i) => (
+                  <div key={i} className="flex items-start gap-2 rounded-lg bg-primary/5 p-3">
+                    <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                    <p className="text-xs text-primary">{interp}</p>
+                  </div>
+                ))}
               </div>
             )}
           </div>
         );
+      }
       case 4:
         return (
           <div className="space-y-4">
             <Label>What are you seeking help with?</Label>
             <div className="space-y-3">
               {[
-                { value: 'weight-loss' as const, label: 'Weight Loss' },
-                { value: 'diabetes' as const, label: 'Type 2 Diabetes Management' },
-                { value: 'both' as const, label: 'Both' },
+                { value: 'weight-loss' as const, label: 'Weight Loss', desc: 'GLP-1 based medical weight management' },
+                { value: 'diabetes' as const, label: 'Type 2 Diabetes Management', desc: 'Blood sugar control with evidence-based medications' },
+                { value: 'both' as const, label: 'Both', desc: 'Combined weight and diabetes management' },
               ].map(opt => (
                 <button key={opt.value} onClick={() => setProgram(opt.value)}
-                  className={`w-full rounded-lg border p-4 text-left text-sm font-medium transition-colors ${program === opt.value ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:border-primary/50'}`}>
-                  {opt.label}
+                  className={`w-full rounded-lg border p-4 text-left transition-colors ${program === opt.value ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/50'}`}>
+                  <p className={`text-sm font-medium ${program === opt.value ? 'text-primary' : 'text-muted-foreground'}`}>{opt.label}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{opt.desc}</p>
                 </button>
               ))}
             </div>
           </div>
         );
-      case 5:
+      case 5: {
+        const condInterps = getConditionInterpretation();
         return (
           <div className="space-y-4">
             <Label>Do you have any of these existing conditions?</Label>
@@ -144,8 +221,19 @@ export default function Quiz() {
                 None of the above
               </label>
             </div>
+            {condInterps.length > 0 && (
+              <div className="space-y-2">
+                {condInterps.map((flag, i) => (
+                  <div key={i} className="flex items-start gap-2 rounded-lg bg-accent/10 p-3">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
+                    <p className="text-xs text-accent">{flag}</p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         );
+      }
       case 6:
         return (
           <div className="space-y-4">
@@ -155,6 +243,12 @@ export default function Quiz() {
               <Checkbox checked={noMeds} onCheckedChange={(c) => { setNoMeds(!!c); if (c) setMedications(''); }} />
               I am not currently taking any medications
             </label>
+            {medications && !noMeds && (
+              <div className="flex items-start gap-2 rounded-lg bg-muted p-3">
+                <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                <p className="text-xs text-muted-foreground">Your doctor will review potential drug interactions during consultation. Some medications may require dose adjustments when starting GLP-1 therapy.</p>
+              </div>
+            )}
           </div>
         );
       case 7: {
@@ -212,6 +306,23 @@ export default function Quiz() {
               <div>
                 <Label htmlFor="hba1c-val">HbA1c value (%)</Label>
                 <Input id="hba1c-val" type="number" step="0.1" min="4" max="14" placeholder="e.g. 7.5" value={hba1c} onChange={e => setHba1c(e.target.value)} />
+                {hba1c && Number(hba1c) >= 4 && (
+                  <div className="mt-2 flex items-start gap-2 rounded-lg bg-muted p-3">
+                    <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                    <p className="text-xs text-muted-foreground">
+                      {Number(hba1c) < 5.7 ? 'Your HbA1c is in the normal range.' :
+                       Number(hba1c) < 6.5 ? 'This indicates pre-diabetes. Lifestyle modifications and monitoring are typically recommended.' :
+                       Number(hba1c) < 8 ? 'This indicates diabetes. Medication management combined with lifestyle changes can help bring this into target range.' :
+                       'This indicates poorly controlled diabetes. Your doctor will prioritize glycemic control in your treatment plan.'}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+            {hba1cKnown === 'untested' && (
+              <div className="flex items-start gap-2 rounded-lg bg-muted p-3">
+                <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                <p className="text-xs text-muted-foreground">Your doctor may recommend an HbA1c test as part of your initial assessment. This is a routine blood test available at most labs.</p>
               </div>
             )}
             <Button onClick={finish} className="mt-4 w-full gap-2">View Results <ArrowRight className="h-4 w-4" /></Button>
@@ -246,6 +357,22 @@ export default function Quiz() {
                   <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
                     Based on your responses, you may be a candidate for our {program === 'weight-loss' ? 'Weight Loss' : program === 'diabetes' ? 'Diabetes Management' : 'Weight Loss & Diabetes'} program. The next step is a consultation with one of our physicians, who will review your health profile and determine the most appropriate treatment plan.
                   </p>
+
+                  {/* Pre-consult Summary */}
+                  {bmi > 0 && (
+                    <div className="mx-auto mt-6 max-w-sm rounded-lg border border-border bg-muted/50 p-4 text-left">
+                      <p className="text-xs font-semibold text-foreground">Your Profile Summary</p>
+                      <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+                        <p>Age: {age} · Gender: {gender}</p>
+                        <p>BMI: {bmi} ({bmiInfo?.label})</p>
+                        <p>Program: {program === 'weight-loss' ? 'Weight Loss' : program === 'diabetes' ? 'Diabetes' : 'Both'}</p>
+                        {conditions.length > 0 && <p>Conditions: {conditions.join(', ')}</p>}
+                        {hba1c && <p>HbA1c: {hba1c}%</p>}
+                      </div>
+                      <p className="mt-2 text-[10px] text-muted-foreground">This summary will be shared with your doctor before the consultation.</p>
+                    </div>
+                  )}
+
                   <Button onClick={() => navigate('/consult')} className="mt-6 gap-2">
                     Book Your Consultation <ArrowRight className="h-4 w-4" />
                   </Button>
